@@ -215,13 +215,34 @@ function exportBackup() {
 
 function shareBackupText() {
   const validRouteIds = routeIds.filter((id) => findFlower(id));
-  const nowText = new Date().toLocaleString("zh-TW", {
+
+  const now = new Date();
+
+  const nowText = now.toLocaleString("zh-TW", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit"
   });
+
+  const dateText = now.toISOString().slice(0, 10);
+
+  const backupData = {
+    appName: "Pikmin 花朵地圖",
+    appVersion: APP_VERSION,
+    backupVersion: 2,
+    exportedAt: now.toISOString(),
+    flowerCount: flowers.length,
+    routeCount: validRouteIds.length,
+    flowers,
+    routeIds,
+    lastMapView: localStorage.getItem("pikminLastMapView")
+  };
+
+  const jsonText = JSON.stringify(backupData, null, 2);
+
+  const fileName = `pikmin_flower_backup_${dateText}.json`;
 
   const shareText =
     `我分享 Pikmin 花朵地圖備份給你 🌸\n\n` +
@@ -232,14 +253,23 @@ function shareBackupText() {
     `使用方式：\n` +
     `1. 打開 Pikmin 花朵地圖\n` +
     `2. 按「匯入」\n` +
-    `3. 選擇我傳給你的 JSON 備份檔\n` +
-    `4. 匯入時可以選「合併」，就不會洗掉你原本的花點\n\n` +
-    `提醒：我會另外傳一個 JSON 備份檔給你，請一起下載或儲存。`;
+    `3. 選擇這個 JSON 備份檔\n` +
+    `4. 匯入時可以選「合併」，就不會洗掉原本的花點`;
 
-  if (navigator.share) {
+  const backupFile = new File([jsonText], fileName, {
+    type: "application/json"
+  });
+
+  // 手機若支援檔案分享，就一次分享文字 + JSON 檔
+  if (
+    navigator.canShare &&
+    navigator.canShare({ files: [backupFile] }) &&
+    navigator.share
+  ) {
     navigator.share({
       title: "Pikmin 花朵地圖備份",
-      text: shareText
+      text: shareText,
+      files: [backupFile]
     }).catch(function (error) {
       console.warn("分享取消或失敗", error);
     });
@@ -247,9 +277,13 @@ function shareBackupText() {
     return;
   }
 
+  // 如果不支援檔案分享，就退回只複製文字
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(shareText).then(function () {
-      alert("分享文字已複製，可以貼到 LINE。");
+    navigator.clipboard.writeText(
+      shareText +
+      `\n\n提醒：這台手機不支援直接分享備份檔，請另外按「備份」下載 JSON 檔後一起傳。`
+    ).then(function () {
+      alert("分享文字已複製，可以貼到 LINE。請另外按「備份」把 JSON 檔一起傳給對方。");
     }).catch(function () {
       prompt("請複製以下文字貼到 LINE：", shareText);
     });
