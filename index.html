@@ -26,11 +26,25 @@
   <button id="locateButton" onclick="centerToGps()">📍定位</button>
   <button id="routeButton" onclick="openPanel('route')">路線</button>
   <button id="flowerButton" onclick="openPanel('flowers')">花朵</button>
+  <button id="backupButton" onclick="exportBackup()">備份</button>
+<button id="shareButton" onclick="shareBackupText()">分享</button>
+<button id="importButton" onclick="triggerImportBackup()">匯入</button>
 </div>
+
+<input
+  type="file"
+  id="importBackupInput"
+  accept="application/json"
+  style="display: none;"
+/>
 
 <div id="bottomPanel" class="panel-closed">
 <div id="panelHeader">
-  <h2 id="panelTitle">路線</h2>
+  <div>
+    <h2 id="panelTitle">路線</h2>
+    <div id="panelStats">共 0 點</div>
+  </div>
+  <span id="versionLabel">v0.2</span>
 </div>
 
 <div id="routePanel" class="panel-section">
@@ -45,13 +59,28 @@
 </div>
 
 <div id="flowerPanel" class="panel-section">
+  <div id="flowerTools">
+    <input
+      type="text"
+      id="flowerSearchInput"
+      placeholder="搜尋花名或類型"
+      oninput="handleFlowerSearchInput()"
+    />
+
+    <select id="flowerSortSelect" onchange="handleFlowerSortChange()">
+      <option value="time">依結束時間</option>
+      <option value="distance">依距離</option>
+      <option value="confirmed">依人工確認</option>
+    </select>
+  </div>
+
   <div id="flowerList"></div>
 </div>
 </div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="app.js"></script>
-  
+
   <script>
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(function (error) {

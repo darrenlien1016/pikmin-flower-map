@@ -412,3 +412,96 @@ button.add-route-button {
   border-color: #1976d2;
   font-weight: 700;
 }
+
+/* 右下角按鈕增加備份/匯入後，縮小一點 */
+#floatingButtons {
+  gap: 7px;
+}
+
+#floatingButtons button {
+  min-width: 64px;
+  padding: 8px 11px;
+  font-size: 13px;
+}
+
+/* 花朵清單搜尋與排序 */
+#flowerTools {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+#flowerSearchInput {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+#flowerSortSelect {
+  width: 120px;
+  padding: 9px 8px;
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+}
+
+.flower-type-label {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #eeeeee;
+  font-size: 12px;
+}
+
+.flower-distance {
+  color: #666;
+  font-size: 13px;
+}
+
+button.edit-flower-button {
+  color: #5e35b1;
+  border-color: #5e35b1;
+  font-weight: 700;
+}
+
+#versionLabel {
+  font-size: 12px;
+  color: #888;
+}
+
+#panelStats {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #666;
+}
+
+/* 地圖花點 popup 操作按鈕 */
+.popup-content {
+  min-width: 180px;
+}
+
+.popup-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.popup-actions button {
+  padding: 6px 7px;
+  border: 1px solid #81c784;
+  border-radius: 7px;
+  background: white;
+  color: #2e7d32;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.popup-actions button:last-child {
+  grid-column: 1 / 3;
+}

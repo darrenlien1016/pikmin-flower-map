@@ -67,7 +67,13 @@ function saveMapView() {
 }
 
 // 地圖移動或縮放後，記住目前中心
-map.on("moveend zoomend", saveMapView);
+map.on("moveend zoomend", function () {
+  saveMapView();
+
+  if (!lastGpsPosition && flowerSortMode === "distance") {
+    renderAll();
+  }
+});
 
 // =======================
 // GPS 定位
@@ -169,12 +175,419 @@ function centerToGps() {
 window.centerToGps = centerToGps;
 
 // =======================
+// 備份 / 匯出 / 匯入
+// =======================
+
+function exportBackup() {
+  const validRouteIds = routeIds.filter((id) => findFlower(id));
+
+  const backupData = {
+    appName: "Pikmin 花朵地圖",
+    appVersion: APP_VERSION,
+    backupVersion: 2,
+    exportedAt: new Date().toISOString(),
+    flowerCount: flowers.length,
+    routeCount: validRouteIds.length,
+    flowers,
+    routeIds,
+    lastMapView: localStorage.getItem("pikminLastMapView")
+  };
+
+  const jsonText = JSON.stringify(backupData, null, 2);
+  const blob = new Blob([jsonText], {
+    type: "application/json"
+  });
+
+  const dateText = new Date().toISOString().slice(0, 10);
+  const fileName = `pikmin_flower_backup_${dateText}.json`;
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function shareBackupText() {
+  const validRouteIds = routeIds.filter((id) => findFlower(id));
+  const nowText = new Date().toLocaleString("zh-TW", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+
+  const shareText =
+    `我分享 Pikmin 花朵地圖備份給你 🌸\n\n` +
+    `版本：${APP_VERSION}\n` +
+    `分享時間：${nowText}\n` +
+    `花點數：${flowers.length}\n` +
+    `路線點數：${validRouteIds.length}\n\n` +
+    `使用方式：\n` +
+    `1. 打開 Pikmin 花朵地圖\n` +
+    `2. 按「匯入」\n` +
+    `3. 選擇我傳給你的 JSON 備份檔\n` +
+    `4. 匯入時可以選「合併」，就不會洗掉你原本的花點\n\n` +
+    `提醒：我會另外傳一個 JSON 備份檔給你，請一起下載或儲存。`;
+
+  if (navigator.share) {
+    navigator.share({
+      title: "Pikmin 花朵地圖備份",
+      text: shareText
+    }).catch(function (error) {
+      console.warn("分享取消或失敗", error);
+    });
+
+    return;
+  }
+
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(shareText).then(function () {
+      alert("分享文字已複製，可以貼到 LINE。");
+    }).catch(function () {
+      prompt("請複製以下文字貼到 LINE：", shareText);
+    });
+
+    return;
+  }
+
+  prompt("請複製以下文字貼到 LINE：", shareText);
+}
+
+function triggerImportBackup() {
+  const input = document.getElementById("importBackupInput");
+
+  if (!input) {
+    alert("找不到匯入元件，請確認 index.html 是否已加入 importBackupInput。");
+    return;
+  }
+
+  input.value = "";
+  input.click();
+}
+
+function normalizeFlowerName(name) {
+  return (name || "").trim().toLowerCase();
+}
+
+function normalizeFlowerId(id) {
+  return String(id || "");
+}
+
+function getFlowerCoordinateKey(flower) {
+  const lat = Number(flower.lat);
+  const lng = Number(flower.lng);
+
+  if (Number.isNaN(lat) || Number.isNaN(lng)) {
+    return "";
+  }
+
+  // 小數點 5 位，大約接近 1 公尺等級
+  return `${lat.toFixed(5)},${lng.toFixed(5)}`;
+}
+
+function getDuplicateMatch(existingFlower, importedFlower) {
+  const existingId = normalizeFlowerId(existingFlower.id);
+  const importedId = normalizeFlowerId(importedFlower.id);
+
+  const sameId =
+    existingFlower.id !== undefined &&
+    importedFlower.id !== undefined &&
+    existingId === importedId;
+
+  const sameName =
+    normalizeFlowerName(existingFlower.name) ===
+    normalizeFlowerName(importedFlower.name);
+
+  const keyA = getFlowerCoordinateKey(existingFlower);
+  const keyB = getFlowerCoordinateKey(importedFlower);
+  const sameCoordinateKey = keyA && keyB && keyA === keyB;
+
+  const distance = getDistanceMeters(
+    Number(existingFlower.lat),
+    Number(existingFlower.lng),
+    Number(importedFlower.lat),
+    Number(importedFlower.lng)
+  );
+
+  // 1. 座標幾乎完全一樣，直接視為同一個花點
+  if (sameCoordinateKey) {
+    return {
+      duplicated: true,
+      sameName,
+      sameId,
+      reason: "sameCoordinate"
+    };
+  }
+
+  // 2. 座標非常接近，視為同一個花點
+  if (distance <= 100) {
+    return {
+      duplicated: true,
+      sameName,
+      sameId,
+      reason: "nearCoordinate"
+    };
+  }
+
+  // 3. ID 相同，但座標也要接近，才視為同一個花點
+  if (sameId && distance <= 200) {
+    return {
+      duplicated: true,
+      sameName,
+      sameId,
+      reason: "sameIdAndNearCoordinate"
+    };
+  }
+
+  // 4. 名稱相同，但座標也要接近，才視為同一個花點
+  if (sameName && distance <= 200) {
+    return {
+      duplicated: true,
+      sameName,
+      sameId,
+      reason: "sameNameAndNearCoordinate"
+    };
+  }
+
+  // ID 相同但座標差很遠，不當作同一點
+  // 名稱相同但座標差很遠，也不當作同一點
+  return {
+    duplicated: false,
+    sameName,
+    sameId,
+    reason: "notDuplicated"
+  };
+}
+
+function isSameFlower(a, b) {
+  return getDuplicateMatch(a, b).duplicated;
+}
+
+function mergeImportedFlowers(currentFlowers, importedFlowers) {
+  const mergedFlowers = [...currentFlowers];
+
+  let addedCount = 0;
+  let skippedCount = 0;
+  let skippedSameNameCount = 0;
+  let skippedDifferentNameCount = 0;
+  let skippedSameIdCount = 0;
+  let skippedDifferentIdCount = 0;
+
+  importedFlowers.forEach((importedFlower) => {
+    let duplicateMatch = null;
+
+    const duplicated = mergedFlowers.some((existingFlower) => {
+      const match = getDuplicateMatch(existingFlower, importedFlower);
+
+      if (match.duplicated) {
+        duplicateMatch = match;
+        return true;
+      }
+
+      return false;
+    });
+
+    if (duplicated) {
+      skippedCount += 1;
+
+      if (duplicateMatch && duplicateMatch.sameName) {
+        skippedSameNameCount += 1;
+      } else {
+        skippedDifferentNameCount += 1;
+      }
+
+      if (duplicateMatch && duplicateMatch.sameId) {
+        skippedSameIdCount += 1;
+      } else {
+        skippedDifferentIdCount += 1;
+      }
+
+      return;
+    }
+
+    mergedFlowers.push({
+      ...importedFlower,
+      id: Date.now() + Math.floor(Math.random() * 1000000),
+      type: importedFlower.type || "",
+      updatedAt: new Date().toISOString()
+    });
+
+    addedCount += 1;
+  });
+
+  return {
+    mergedFlowers,
+    addedCount,
+    skippedCount,
+    skippedSameNameCount,
+    skippedDifferentNameCount,
+    skippedSameIdCount,
+    skippedDifferentIdCount
+  };
+}
+
+function formatBackupTime(isoText) {
+  if (!isoText) {
+    return "未記錄";
+  }
+
+  const date = new Date(isoText);
+
+  if (Number.isNaN(date.getTime())) {
+    return "時間格式不明";
+  }
+
+  return date.toLocaleString("zh-TW", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function importBackupFromFile(file) {
+  const reader = new FileReader();
+
+  reader.onload = function (event) {
+    try {
+      const data = JSON.parse(event.target.result);
+
+      if (!data || !Array.isArray(data.flowers)) {
+        alert("備份檔格式不正確，找不到花點資料。");
+        return;
+      }
+
+      const backupAppName = data.appName || "未知工具";
+      const backupAppVersion = data.appVersion || "未記錄";
+      const backupTime = formatBackupTime(data.exportedAt);
+      const backupFlowerCount = Array.isArray(data.flowers)
+        ? data.flowers.length
+        : 0;
+      const backupRouteCount = Array.isArray(data.routeIds)
+        ? data.routeIds.length
+        : 0;
+
+      const importMode = prompt(
+        `即將匯入備份資料：\n\n` +
+        `工具：${backupAppName}\n` +
+        `版本：${backupAppVersion}\n` +
+        `匯出時間：${backupTime}\n` +
+        `花點數：${backupFlowerCount}\n` +
+        `路線點數：${backupRouteCount}\n\n` +
+        `請選擇匯入方式：\n\n` +
+        `1 = 覆蓋目前資料\n` +
+        `2 = 合併到目前資料\n\n` +
+        `按取消 = 不匯入`
+      );
+
+      if (importMode === null) {
+        return;
+      }
+
+      const mode = importMode.trim();
+
+      if (mode !== "1" && mode !== "2") {
+        alert("請輸入 1 或 2。");
+        return;
+      }
+
+      // 1 = 覆蓋目前資料
+      if (mode === "1") {
+        const ok = confirm(
+          `你選擇「覆蓋目前資料」。\n\n` +
+          `目前手機裡的花點與路線資料會被備份檔取代。\n\n` +
+          `確定要繼續嗎？`
+        );
+
+        if (!ok) {
+          return;
+        }
+
+        flowers = data.flowers.map((flower) => ({
+          ...flower,
+          type: flower.type || ""
+        }));
+
+        routeIds = Array.isArray(data.routeIds) ? data.routeIds : [];
+
+        saveFlowers();
+        saveRoute();
+
+        if (data.lastMapView) {
+          localStorage.setItem("pikminLastMapView", data.lastMapView);
+        }
+
+        selectedFlowerId = null;
+        renderAll();
+
+        alert(
+          `覆蓋匯入完成！\n\n` +
+          `花點數：${flowers.length}\n` +
+          `路線點數：${routeIds.filter((id) => findFlower(id)).length}`
+        );
+
+        return;
+      }
+
+      // 2 = 合併到目前資料
+      if (mode === "2") {
+        const result = mergeImportedFlowers(flowers, data.flowers);
+
+        flowers = result.mergedFlowers;
+
+        // 合併模式下：保留目前路線，不自動匯入對方路線
+        // 因為對方的路線順序不一定適合你目前的位置與規劃
+        saveFlowers();
+        saveRoute();
+
+        selectedFlowerId = null;
+        renderAll();
+
+       alert(
+  `合併匯入完成！\n\n` +
+  `原本花點數：${flowers.length - result.addedCount}\n` +
+  `新增花點數：${result.addedCount}\n` +
+  `略過重複花點：${result.skippedCount}\n` +
+  `　其中名稱相同：${result.skippedSameNameCount}\n` +
+  `　其中名稱不同：${result.skippedDifferentNameCount}\n` +
+  `　其中 ID 相同：${result.skippedSameIdCount}\n` +
+  `　其中 ID 不同：${result.skippedDifferentIdCount}\n` +
+  `目前花點總數：${flowers.length}\n\n` +
+  `提醒：合併模式會保留你原本的路線，不會匯入對方路線。`
+);
+      }
+    } catch (error) {
+      console.error("匯入備份失敗", error);
+      alert("匯入失敗，請確認檔案是否為正確的 JSON 備份檔。");
+    }
+  };
+
+  reader.readAsText(file);
+}
+
+window.exportBackup = exportBackup;
+window.triggerImportBackup = triggerImportBackup;
+window.shareBackupText = shareBackupText;
+
+// =======================
 // 本機儲存
 // =======================
+
+const APP_VERSION = "v0.2";
 
 let flowers = loadFlowers();
 let routeIds = loadRoute();
 let selectedFlowerId = null;
+let flowerSearchText = "";
+let flowerSortMode = "time";
 
 function loadFlowers() {
   const saved = localStorage.getItem("pikminFlowers");
@@ -184,7 +597,10 @@ function loadFlowers() {
   }
 
   try {
-    return JSON.parse(saved);
+return JSON.parse(saved).map((flower) => ({
+  ...flower,
+  type: flower.type || ""
+}));
   } catch (error) {
     console.error("讀取花點資料失敗", error);
     return [];
@@ -270,6 +686,8 @@ function openPanel(type) {
     flowerPanel.classList.add("active");
     flowerButton.classList.add("active");
   }
+
+updatePanelStats();
 }
 
 function forceOpenPanel(type) {
@@ -301,6 +719,8 @@ function forceOpenPanel(type) {
     flowerPanel.classList.add("active");
     flowerButton.classList.add("active");
   }
+
+  updatePanelStats();
 }
 
 window.openPanel = openPanel;
@@ -485,6 +905,85 @@ function getListStatusClass(flower) {
   return "";
 }
 
+function getDistanceMeters(lat1, lng1, lat2, lng2) {
+  const earthRadius = 6371000;
+  const toRad = (value) => value * Math.PI / 180;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadius * c;
+}
+
+function getReferencePosition() {
+  if (lastGpsPosition) {
+    return {
+      lat: lastGpsPosition.lat,
+      lng: lastGpsPosition.lng,
+      source: "gps"
+    };
+  }
+
+  const center = map.getCenter();
+
+  return {
+    lat: center.lat,
+    lng: center.lng,
+    source: "map"
+  };
+}
+
+function getFlowerDistanceMeters(flower) {
+  const reference = getReferencePosition();
+
+  return getDistanceMeters(
+    reference.lat,
+    reference.lng,
+    flower.lat,
+    flower.lng
+  );
+}
+
+function getFlowerDistanceText(flower) {
+  const reference = getReferencePosition();
+  const meters = getFlowerDistanceMeters(flower);
+
+  const prefix = reference.source === "gps"
+    ? "距離：約 "
+    : "距離：依地圖中心約 ";
+
+  if (meters < 1000) {
+    return `${prefix}${Math.round(meters)} m`;
+  }
+
+  return `${prefix}${(meters / 1000).toFixed(1)} km`;
+}
+
+function handleFlowerSearchInput() {
+  const input = document.getElementById("flowerSearchInput");
+  flowerSearchText = input ? input.value.trim().toLowerCase() : "";
+  renderAll();
+}
+
+function handleFlowerSortChange() {
+  const select = document.getElementById("flowerSortSelect");
+  flowerSortMode = select ? select.value : "time";
+  renderAll();
+}
+
+window.handleFlowerSearchInput = handleFlowerSearchInput;
+window.handleFlowerSortChange = handleFlowerSortChange;
+
+
 // =======================
 // 花點操作
 // =======================
@@ -508,18 +1007,25 @@ function addFlower(lat, lng) {
     return;
   }
 
-  const flower = {
-    id: Date.now(),
-    name: name.trim() || "未命名花朵",
-    lat,
-    lng,
-    endTime: endTime.toISOString(),
-    confirmed: true,
-    fruitTaken: false,
-    note: "",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
+  const typeInput = prompt("請輸入花朵類型，可留空，例如：紅花、藍花、白花、特殊花");
+
+if (typeInput === null) {
+  return;
+}
+
+const flower = {
+  id: Date.now(),
+  name: name.trim() || "未命名花朵",
+  type: typeInput.trim(),
+  lat,
+  lng,
+  endTime: endTime.toISOString(),
+  confirmed: true,
+  fruitTaken: false,
+  note: "",
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString()
+};
 
   flowers.push(flower);
   selectedFlowerId = flower.id;
@@ -561,6 +1067,33 @@ function updateFlowerTime(id) {
   saveFlowers();
   renderAll();
   focusFlower(id);
+}
+
+function editFlowerInfo(id) {
+  const flower = findFlower(id);
+
+  if (!flower) {
+    return;
+  }
+
+  const newName = prompt("請輸入花朵名稱", flower.name || "");
+
+  if (newName === null) {
+    return;
+  }
+
+  const newType = prompt("請輸入花朵類型，可留空", flower.type || "");
+
+  if (newType === null) {
+    return;
+  }
+
+  flower.name = newName.trim() || "未命名花朵";
+  flower.type = newType.trim();
+  flower.updatedAt = new Date().toISOString();
+
+  saveFlowers();
+  keepFlowerPanelOpen(id);
 }
 
 function toggleFruitTaken(id) {
@@ -741,6 +1274,26 @@ function moveRouteBottom(id) {
   renderAll();
 }
 
+function openGoogleMapsSingleFlower(id) {
+  const flower = findFlower(id);
+
+  if (!flower) {
+    alert("找不到這個花點。");
+    return;
+  }
+
+  const destination = `${flower.lat},${flower.lng}`;
+
+  const params = new URLSearchParams({
+    api: "1",
+    destination,
+    travelmode: "walking"
+  });
+
+  const url = `https://www.google.com/maps/dir/?${params.toString()}`;
+  window.open(url, "_blank");
+}
+
 function openGoogleMapsRoute() {
   const routeFlowers = routeIds
     .map((id) => findFlower(id))
@@ -822,15 +1375,44 @@ window.moveRouteTop = moveRouteTop;
 window.moveRouteBottom = moveRouteBottom;
 window.clearRoute = clearRoute;
 window.openGoogleMapsRoute = openGoogleMapsRoute;
+window.openGoogleMapsSingleFlower = openGoogleMapsSingleFlower;
 
 // =======================
 // 畫面更新
 // =======================
 
+function updatePanelStats(visibleFlowerCount = null) {
+  const stats = document.getElementById("panelStats");
+
+  if (!stats) {
+    return;
+  }
+
+  const totalFlowerCount = flowers.length;
+  const routeCount = routeIds.filter((id) => findFlower(id)).length;
+
+  if (activePanel === "flowers") {
+    if (visibleFlowerCount === null) {
+      stats.innerText = `共 ${totalFlowerCount} 點｜路線 ${routeCount} 點`;
+    } else {
+      stats.innerText = `共 ${totalFlowerCount} 點｜顯示 ${visibleFlowerCount} 點｜路線 ${routeCount} 點`;
+    }
+    return;
+  }
+
+  if (activePanel === "route") {
+    stats.innerText = `路線 ${routeCount} 點｜花朵 ${totalFlowerCount} 點`;
+    return;
+  }
+
+  stats.innerText = `花朵 ${totalFlowerCount} 點｜路線 ${routeCount} 點`;
+}
+
 function renderAll() {
   renderFlowers();
   renderRoute();
   drawRouteLine();
+  updatePanelStats();
 }
 
 function renderFlowers() {
@@ -845,11 +1427,42 @@ function renderFlowers() {
   const flowerList = document.getElementById("flowerList");
   flowerList.innerHTML = "";
 
-  const sortedFlowers = [...flowers].sort((a, b) => {
-    return new Date(a.endTime).getTime() - new Date(b.endTime).getTime();
-  });
+let visibleFlowers = [...flowers];
 
-  sortedFlowers.forEach((flower) => {
+// 搜尋花名或花朵類型
+if (flowerSearchText) {
+  visibleFlowers = visibleFlowers.filter((flower) => {
+    const name = (flower.name || "").toLowerCase();
+    const type = (flower.type || "").toLowerCase();
+
+    return name.includes(flowerSearchText) || type.includes(flowerSearchText);
+  });
+}
+
+// 排序
+const sortedFlowers = visibleFlowers.sort((a, b) => {
+  if (flowerSortMode === "distance") {
+  const distanceA = getFlowerDistanceMeters(a);
+  const distanceB = getFlowerDistanceMeters(b);
+
+  return distanceA - distanceB;
+}
+
+  if (flowerSortMode === "confirmed") {
+    if (a.confirmed === b.confirmed) {
+      return new Date(a.endTime).getTime() - new Date(b.endTime).getTime();
+    }
+
+    // 未人工確認排上面
+    return a.confirmed ? 1 : -1;
+  }
+
+  // 預設：依結束時間
+  return new Date(a.endTime).getTime() - new Date(b.endTime).getTime();
+});
+
+    updatePanelStats(sortedFlowers.length);  
+    sortedFlowers.forEach((flower) => {
     const remainingText = getRemainingText(flower.endTime);
     const status = getFlowerStatus(flower);
     const flowerClass = getFlowerClass(flower);
@@ -861,8 +1474,9 @@ function renderFlowers() {
       className: "",
       html: `
         <div class="flower-label ${flowerClass}">
-          <div class="flower-name">${flower.name}</div>
-          <div class="flower-time">${remainingText}</div>
+        <div class="flower-name">${flower.name}</div>
+${flower.type ? `<div class="flower-type">${flower.type}</div>` : ""}
+<div class="flower-time">${remainingText}</div>
         </div>
       `,
       iconSize: [90, 42],
@@ -888,37 +1502,47 @@ function renderFlowers() {
       }, 100);
     });
 
-    marker.bindPopup(`
-      <strong>${flower.name}</strong><br>
-      剩餘時間：${remainingText}<br>
-      狀態：${status}<br>
-      ${flower.confirmed ? "人工確認" : "未人工確認"}<br>
-      ${flower.fruitTaken ? "已拿果" : "未拿果"}
+marker.bindPopup(`
+  <div class="popup-content">
+    <strong>${flower.name}</strong><br>
+    ${flower.type ? `類型：${flower.type}<br>` : ""}
+    剩餘時間：${remainingText}<br>
+    狀態：${status}<br>
+    ${flower.confirmed ? "人工確認" : "未人工確認"}<br>
+    ${flower.fruitTaken ? "已拿果" : "未拿果"}
 
-      <div class="popup-actions">
-        <button onclick="updateFlowerTime(${flower.id})">更新時間</button>
-        <button onclick="toggleFruitTaken(${flower.id})">
-          ${flower.fruitTaken ? "改未拿果" : "已拿果"}
-        </button>
-        <button class="${routeButtonClass}" onclick="toggleRoute(${flower.id})">${routeText}</button>
-        <button onclick="deleteFlower(${flower.id})">刪除</button>
-      </div>
-    `);
+    <div class="popup-actions">
+      <button onclick="updateFlowerTime(${flower.id})">更新時間</button>
+      <button onclick="editFlowerInfo(${flower.id})">編輯</button>
+      <button onclick="toggleFruitTaken(${flower.id})">
+        ${flower.fruitTaken ? "改未拿果" : "已拿果"}
+      </button>
+      <button class="${routeButtonClass}" onclick="toggleRoute(${flower.id})">${routeText}</button>
+      <button onclick="openGoogleMapsSingleFlower(${flower.id})">Google導航</button>
+      <button onclick="deleteFlower(${flower.id})">刪除</button>
+    </div>
+  </div>
+`);
 
     const item = document.createElement("div");
     item.id = `flower-item-${flower.id}`;
     item.className = `flower-item ${listStatusClass} ${selectedFlowerId === flower.id ? "selected" : ""}`;
 
     item.innerHTML = `
-      <div class="flower-item-title">${flower.name}</div>
+    <div class="flower-item-title">
+  ${flower.name}
+  ${flower.type ? `<span class="flower-type-label">${flower.type}</span>` : ""}
+</div>
       <div class="flower-item-meta">
-        剩餘時間：${remainingText}<br>
-        狀態：${status}<br>
-        ${flower.confirmed ? "人工確認" : "未人工確認"}｜${flower.fruitTaken ? "已拿果" : "未拿果"}
+剩餘時間：${remainingText}<br>
+狀態：${status}<br>
+${flower.confirmed ? "人工確認" : "未人工確認"}｜${flower.fruitTaken ? "已拿果" : "未拿果"}<br>
+<span class="flower-distance">${getFlowerDistanceText(flower)}</span>
       </div>
 
       <div class="flower-actions">
-        <button onclick="event.stopPropagation(); updateFlowerTime(${flower.id})">更新時間</button>
+      <button class="edit-flower-button" onclick="event.stopPropagation(); editFlowerInfo(${flower.id})">編輯</button>  
+      <button onclick="event.stopPropagation(); updateFlowerTime(${flower.id})">更新時間</button>
         <button onclick="event.stopPropagation(); toggleFruitTaken(${flower.id})">
           ${flower.fruitTaken ? "改未拿果" : "標記已拿果"}
         </button>
@@ -1019,6 +1643,7 @@ function drawRouteLine() {
 // =======================
 
 window.updateFlowerTime = updateFlowerTime;
+window.editFlowerInfo = editFlowerInfo;
 window.toggleFruitTaken = toggleFruitTaken;
 window.deleteFlower = deleteFlower;
 window.focusFlower = focusFlower;
@@ -1036,3 +1661,17 @@ renderAll();
 
 // 頁面載入時嘗試用 GPS 作為地圖中心
 centerToGpsOnLoad();
+
+const importBackupInput = document.getElementById("importBackupInput");
+
+if (importBackupInput) {
+  importBackupInput.addEventListener("change", function (event) {
+    const file = event.target.files[0];
+
+    if (!file) {
+      return;
+    }
+
+    importBackupFromFile(file);
+  });
+}
