@@ -1,0 +1,414 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+#map {
+  height: 70vh;
+  width: 100%;
+}
+
+#bottomPanel {
+  height: 30vh;
+  padding: 12px;
+  overflow-y: auto;
+  background: #ffffff;
+  box-sizing: border-box;
+  border-top: 1px solid #ddd;
+}
+
+#bottomPanel h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.flower-item {
+  padding: 8px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #f3f3f3;
+  font-size: 14px;
+}
+.flower-label {
+  min-width: 70px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: white;
+  border: 2px solid #666;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.flower-label .flower-name {
+  font-weight: 700;
+}
+
+.flower-label .flower-time {
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.flower-normal {
+  border-color: #555;
+}
+
+.flower-bloom {
+  border-color: #1e88e5;
+  background: #e3f2fd;
+}
+
+.flower-ending {
+  border-color: #e53935;
+  background: #ffebee;
+}
+
+.flower-unconfirmed {
+  border-color: #f9a825;
+  background: #fff8e1;
+}
+
+.flower-taken {
+  opacity: 0.45;
+}
+
+.flower-actions {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.flower-actions button {
+  padding: 6px 8px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+}
+
+.flower-actions button:active {
+  background: #ddd;
+}
+
+#map {
+  height: 100vh;
+  width: 100%;
+}
+
+#panelToggle {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 1000;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: white;
+  border: 1px solid #bbb;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+#bottomPanel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 38vh;
+  padding: 10px;
+  overflow-y: auto;
+  background: #ffffff;
+  box-sizing: border-box;
+  border-top: 1px solid #ddd;
+  z-index: 999;
+  transition: transform 0.2s ease;
+}
+
+#bottomPanel.panel-closed {
+  transform: translateY(100%);
+}
+
+#bottomPanel.panel-open {
+  transform: translateY(0);
+}
+
+#panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+#panelHeader h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+#panelHeader button {
+  padding: 6px 10px;
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  background: white;
+}
+
+.flower-item {
+  padding: 10px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  background: #f3f3f3;
+  font-size: 14px;
+  border: 2px solid transparent;
+}
+
+.flower-item.selected {
+  border-color: #1e88e5;
+  background: #e3f2fd;
+}
+
+.flower-item-title {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.flower-item-meta {
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.flower-actions {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.flower-actions button {
+  padding: 7px 9px;
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+}
+
+.popup-actions {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.popup-actions button {
+  padding: 7px 8px;
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  background: white;
+  font-size: 13px;
+}
+
+/* 今日花朵收合按鈕改到右下角 */
+#panelToggle {
+  left: auto;
+  right: 12px;
+  bottom: 12px;
+}
+
+/* 下方清單：快結束 */
+.flower-item.list-ending {
+  background: #ffebee;
+  border-color: #e53935;
+}
+
+/* 下方清單：剛開花 */
+.flower-item.list-bloom {
+  background: #e3f2fd;
+  border-color: #1e88e5;
+}
+
+/* 下方清單：未人工確認 */
+.flower-item.list-unconfirmed {
+  background: #fff8e1;
+  border-color: #f9a825;
+}
+
+/* 下方清單：已拿果 */
+.flower-item.list-taken {
+  opacity: 0.45;
+}
+
+/* 右下角 GPS 定位按鈕 */
+#locateButton {
+  position: fixed;
+  right: 12px;
+  bottom: 58px;
+  z-index: 1000;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: white;
+  border: 1px solid #bbb;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+
+/* 今日路線區塊 */
+#routePanel {
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f6f6f6;
+  border: 1px solid #ddd;
+}
+
+#routeHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+#routeHeader button {
+  padding: 6px 10px;
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  background: white;
+  font-size: 13px;
+}
+
+.route-item {
+  padding: 8px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.route-item-title {
+  font-weight: 700;
+}
+
+.route-actions {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.route-actions button {
+  padding: 6px 8px;
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  background: white;
+  font-size: 13px;
+}
+
+.route-empty {
+  font-size: 13px;
+  color: #777;
+}
+
+.route-header-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.route-header-actions button {
+  padding: 6px 10px;
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  background: white;
+  font-size: 13px;
+}
+
+/* 右下角三顆固定按鈕 */
+#floatingButtons {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#floatingButtons button {
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: white;
+  border: 1px solid #bbb;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+#floatingButtons button.active {
+  background: #e3f2fd;
+  border-color: #1e88e5;
+}
+
+/* 舊的今日花朵按鈕不用了 */
+#panelToggle {
+  display: none;
+}
+
+/* 面板內只顯示目前選到的區塊 */
+.panel-section {
+  display: none;
+}
+
+.panel-section.active {
+  display: block;
+}
+
+/* 右下角三顆按鈕重新排列：定位、路線、花朵 */
+#floatingButtons {
+  position: fixed;
+  right: 12px;
+  bottom: 18px;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+#floatingButtons button {
+  min-width: 72px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: white;
+  border: 1px solid #bbb;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* 避免舊的定位按鈕位置設定干擾 */
+#locateButton {
+  position: static;
+  right: auto;
+  bottom: auto;
+}
+
+/* 花朵清單：已在路線的按鈕 */
+button.in-route-button {
+  color: #ffffff;
+  background: #1976d2;
+  border-color: #1976d2;
+  font-weight: 700;
+}
+
+/* 花朵清單：加入路線的按鈕 */
+button.add-route-button {
+  color: #1976d2;
+  background: #ffffff;
+  border-color: #1976d2;
+  font-weight: 700;
+}

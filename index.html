@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Pikmin 花朵地圖</title>
+
+  <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#81c784">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="花朵地圖">
+<link rel="apple-touch-icon" href="icon.svg">
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet/dist/leaflet.css"
+  />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="map"></div>
+
+<div id="floatingButtons">
+  <button id="locateButton" onclick="centerToGps()">📍定位</button>
+  <button id="routeButton" onclick="openPanel('route')">路線</button>
+  <button id="flowerButton" onclick="openPanel('flowers')">花朵</button>
+</div>
+
+<div id="bottomPanel" class="panel-closed">
+<div id="panelHeader">
+  <h2 id="panelTitle">路線</h2>
+</div>
+
+<div id="routePanel" class="panel-section">
+  <div id="routeHeader">
+    <strong>路線</strong>
+    <div class="route-header-actions">
+      <button onclick="openGoogleMapsRoute()">Google導航</button>
+      <button onclick="clearRoute()">清空路線</button>
+    </div>
+  </div>
+  <div id="routeList"></div>
+</div>
+
+<div id="flowerPanel" class="panel-section">
+  <div id="flowerList"></div>
+</div>
+</div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+  
+  <script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch(function (error) {
+      console.warn("Service Worker 註冊失敗", error);
+    });
+  }
+</script>
+</body>
+</html>
