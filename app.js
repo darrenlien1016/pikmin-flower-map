@@ -1297,6 +1297,12 @@ function addToRoute(id) {
 
 function removeFromRoute(id) {
   routeIds = routeIds.filter((routeId) => routeId !== id);
+
+  trackEvent("remove_route", {
+    route_count: routeIds.length,
+    source: "route_panel"
+  });
+
   saveRoute();
   renderAll();
 }
@@ -1378,15 +1384,10 @@ function openGoogleMapsSingleFlower(id) {
   const url = `https://www.google.com/maps/dir/?${params.toString()}`;
 
 trackEvent("open_google_maps", {
-  mode: "route",
-  route_count: routeIds.length
-});
-
-trackEvent("open_google_maps", {
   mode: "single"
 });
 
-  window.open(url, "_blank");
+window.open(url, "_blank");
 }
 
 function openGoogleMapsRoute() {
@@ -1445,6 +1446,11 @@ function openGoogleMapsRoute() {
   }
 
   const url = `https://www.google.com/maps/dir/?${params.toString()}`;
+
+trackEvent("open_google_maps", {
+  mode: "route",
+  route_count: usedFlowers.length
+});
 
   window.open(url, "_blank");
 }
