@@ -1,4 +1,4 @@
-const CACHE_NAME = "pikmin-flower-map-v2";
+const CACHE_NAME = "pikmin-flower-map-v3";
 
 const ASSETS = [
   "./",

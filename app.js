@@ -209,12 +209,22 @@ function exportBackup() {
   document.body.appendChild(link);
   link.click();
 
+  trackEvent("export_backup", {
+  flower_count: flowers.length,
+  route_count: validRouteIds.length
+});
+
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
 
 function shareBackupText() {
   const validRouteIds = routeIds.filter((id) => findFlower(id));
+
+  trackEvent("share_backup", {
+  flower_count: flowers.length,
+  route_count: validRouteIds.length
+});
 
   const now = new Date();
 
@@ -562,6 +572,12 @@ function importBackupFromFile(file) {
         selectedFlowerId = null;
         renderAll();
 
+trackEvent("import_backup", {
+  mode: "overwrite",
+  flower_count: flowers.length,
+  route_count: routeIds.filter((id) => findFlower(id)).length
+});
+
         alert(
           `覆蓋匯入完成！\n\n` +
           `花點數：${flowers.length}\n` +
@@ -584,6 +600,12 @@ function importBackupFromFile(file) {
 
         selectedFlowerId = null;
         renderAll();
+
+trackEvent("merge_import", {
+  added_count: result.addedCount,
+  skipped_count: result.skippedCount,
+  flower_count: flowers.length
+});
 
        alert(
   `合併匯入完成！\n\n` +
@@ -615,7 +637,16 @@ window.shareBackupText = shareBackupText;
 // 本機儲存
 // =======================
 
-const APP_VERSION = "v0.2";
+const APP_VERSION = "v0.3";
+
+function trackEvent(eventName, params = {}) {
+  if (typeof gtag === "function") {
+    gtag("event", eventName, {
+      app_version: APP_VERSION,
+      ...params
+    });
+  }
+}
 
 let flowers = loadFlowers();
 let routeIds = loadRoute();
@@ -1062,6 +1093,11 @@ const flower = {
 };
 
   flowers.push(flower);
+
+  trackEvent("add_flower", {
+  has_type: Boolean(flower.type)
+});
+
   selectedFlowerId = flower.id;
 
   saveFlowers();
@@ -1097,6 +1133,8 @@ function updateFlowerTime(id) {
   flower.endTime = endTime.toISOString();
   flower.confirmed = true;
   flower.updatedAt = new Date().toISOString();
+
+  trackEvent("update_flower_time");
 
   saveFlowers();
   renderAll();
@@ -1229,8 +1267,16 @@ function toggleRoute(id) {
 
   if (routeIds.includes(id)) {
     routeIds = routeIds.filter((routeId) => routeId !== id);
+
+    trackEvent("remove_route", {
+      route_count: routeIds.length
+    });
   } else {
     routeIds.push(id);
+
+    trackEvent("add_route", {
+      route_count: routeIds.length
+    });
   }
 
   saveRoute();
@@ -1325,6 +1371,16 @@ function openGoogleMapsSingleFlower(id) {
   });
 
   const url = `https://www.google.com/maps/dir/?${params.toString()}`;
+
+trackEvent("open_google_maps", {
+  mode: "route",
+  route_count: routeIds.length
+});
+
+trackEvent("open_google_maps", {
+  mode: "single"
+});
+
   window.open(url, "_blank");
 }
 
