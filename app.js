@@ -640,12 +640,17 @@ window.shareBackupText = shareBackupText;
 const APP_VERSION = "v0.3";
 
 function trackEvent(eventName, params = {}) {
-  if (typeof gtag === "function") {
-    gtag("event", eventName, {
+  console.log("GA event:", eventName, params);
+
+  if (typeof window.gtag === "function") {
+    window.gtag("event", eventName, {
       app_version: APP_VERSION,
       ...params
     });
+    return;
   }
+
+  console.warn("gtag 尚未載入，事件未送出：", eventName);
 }
 
 let flowers = loadFlowers();
