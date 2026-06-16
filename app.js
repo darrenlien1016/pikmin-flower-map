@@ -174,6 +174,18 @@ function centerToGps() {
 
 window.centerToGps = centerToGps;
 
+function toggleMoreMenu() {
+  const menu = document.getElementById("moreMenu");
+
+  if (!menu) {
+    return;
+  }
+
+  menu.classList.toggle("hidden");
+}
+
+window.toggleMoreMenu = toggleMoreMenu;
+
 // =======================
 // 備份 / 匯出 / 匯入
 // =======================
@@ -457,11 +469,12 @@ function mergeImportedFlowers(currentFlowers, importedFlowers) {
     }
 
     mergedFlowers.push({
-      ...importedFlower,
-      id: Date.now() + Math.floor(Math.random() * 1000000),
-      type: importedFlower.type || "",
-      updatedAt: new Date().toISOString()
-    });
+  ...importedFlower,
+  id: Date.now() + Math.floor(Math.random() * 1000000),
+  type: importedFlower.type || "",
+  group: importedFlower.group || "",
+  updatedAt: new Date().toISOString()
+});
 
     addedCount += 1;
   });
@@ -557,7 +570,8 @@ function importBackupFromFile(file) {
 
         flowers = data.flowers.map((flower) => ({
           ...flower,
-          type: flower.type || ""
+          type: flower.type || "",
+          group: flower.group || ""
         }));
 
         routeIds = Array.isArray(data.routeIds) ? data.routeIds : [];
@@ -637,7 +651,7 @@ window.shareBackupText = shareBackupText;
 // 本機儲存
 // =======================
 
-const APP_VERSION = "v0.3";
+const APP_VERSION = "v0.4";
 
 function trackEvent(eventName, params = {}) {
   console.log("GA event:", eventName, params);
@@ -658,6 +672,7 @@ let routeIds = loadRoute();
 let selectedFlowerId = null;
 let flowerSearchText = "";
 let flowerSortMode = "time";
+let flowerGroupFilter = "all";
 
 function loadFlowers() {
   const saved = localStorage.getItem("pikminFlowers");
@@ -669,7 +684,8 @@ function loadFlowers() {
   try {
 return JSON.parse(saved).map((flower) => ({
   ...flower,
-  type: flower.type || ""
+  type: flower.type || "",
+  group: flower.group || ""
 }));
   } catch (error) {
     console.error("讀取花點資料失敗", error);
@@ -1038,6 +1054,77 @@ function getFlowerDistanceText(flower) {
   return `${prefix}${(meters / 1000).toFixed(1)} km`;
 }
 
+function getFlowerGroupText(flower) {
+  if (!flower.group) {
+    return "待分組";
+  }
+
+  return `${flower.group}組`;
+}
+
+function getNextFlowerGroup(currentGroup) {
+  if (!currentGroup) {
+    return "A";
+  }
+
+  if (currentGroup === "A") {
+    return "B";
+  }
+
+  if (currentGroup === "B") {
+    return "C";
+  }
+
+  return "";
+}
+
+function toggleFlowerGroup(id) {
+  const flower = findFlower(id);
+
+  if (!flower) {
+    return;
+  }
+
+  flower.group = getNextFlowerGroup(flower.group);
+  flower.updatedAt = new Date().toISOString();
+
+  trackEvent("toggle_flower_group", {
+    group: flower.group || "ungrouped"
+  });
+
+  saveFlowers();
+  keepFlowerPanelOpen(id);
+}
+
+function handleFlowerGroupFilterChange() {
+  const select = document.getElementById("flowerGroupFilterSelect");
+  flowerGroupFilter = select ? select.value : "all";
+  renderAll();
+}
+
+function getCompactFlowerMetaText(flower) {
+  const status = getFlowerStatus(flower);
+  const confirmedText = flower.confirmed ? "已確認" : "未確認";
+
+  const distanceText = getFlowerDistanceText(flower)
+    .replace("距離：約 ", "約 ")
+    .replace("距離：依地圖中心約 ", "地圖中心約 ");
+
+  if (!flower.confirmed) {
+    return `${confirmedText}｜${distanceText}`;
+  }
+
+  if (status === "一般") {
+    return `${confirmedText}｜${distanceText}`;
+  }
+
+  if (status === "已拿果") {
+    return `${confirmedText}｜${distanceText}`;
+  }
+
+  return `${status}｜${confirmedText}｜${distanceText}`;
+}
+
 function handleFlowerSearchInput() {
   const input = document.getElementById("flowerSearchInput");
   flowerSearchText = input ? input.value.trim().toLowerCase() : "";
@@ -1052,6 +1139,8 @@ function handleFlowerSortChange() {
 
 window.handleFlowerSearchInput = handleFlowerSearchInput;
 window.handleFlowerSortChange = handleFlowerSortChange;
+window.handleFlowerGroupFilterChange = handleFlowerGroupFilterChange;
+window.toggleFlowerGroup = toggleFlowerGroup;
 
 
 // =======================
@@ -1077,7 +1166,7 @@ function addFlower(lat, lng) {
     return;
   }
 
-  const typeInput = prompt("請輸入花朵類型，可留空，例如：紅花、藍花、白花、特殊花");
+  const typeInput = prompt("請輸入備註，可留空，例如：活動花、常開點、公園內、要走進去");
 
 if (typeInput === null) {
   return;
@@ -1087,6 +1176,7 @@ const flower = {
   id: Date.now(),
   name: name.trim() || "未命名花朵",
   type: typeInput.trim(),
+  group: "",
   lat,
   lng,
   endTime: endTime.toISOString(),
@@ -1159,7 +1249,7 @@ function editFlowerInfo(id) {
     return;
   }
 
-  const newType = prompt("請輸入花朵類型，可留空", flower.type || "");
+  const newType = prompt("請輸入備註，可留空", flower.type || "");
 
   if (newType === null) {
     return;
@@ -1540,6 +1630,19 @@ if (flowerSearchText) {
   });
 }
 
+// 分組篩選
+if (flowerGroupFilter !== "all") {
+  visibleFlowers = visibleFlowers.filter((flower) => {
+    const group = flower.group || "";
+
+    if (flowerGroupFilter === "ungrouped") {
+      return !group;
+    }
+
+    return group === flowerGroupFilter;
+  });
+}
+
 // 排序
 const sortedFlowers = visibleFlowers.sort((a, b) => {
   if (flowerSortMode === "distance") {
@@ -1606,7 +1709,7 @@ ${flower.type ? `<div class="flower-type">${flower.type}</div>` : ""}
 marker.bindPopup(`
   <div class="popup-content">
     <strong>${flower.name}</strong><br>
-    ${flower.type ? `類型：${flower.type}<br>` : ""}
+    ${flower.type ? `備註：${flower.type}<br>` : ""}
     剩餘時間：${remainingText}<br>
     狀態：${status}<br>
     ${flower.confirmed ? "人工確認" : "未人工確認"}<br>
@@ -1629,29 +1732,26 @@ marker.bindPopup(`
     item.id = `flower-item-${flower.id}`;
     item.className = `flower-item ${listStatusClass} ${selectedFlowerId === flower.id ? "selected" : ""}`;
 
-    item.innerHTML = `
-    <div class="flower-item-title">
-  ${flower.name}
-  ${flower.type ? `<span class="flower-type-label">${flower.type}</span>` : ""}
-</div>
-      <div class="flower-item-meta">
-剩餘時間：${remainingText}<br>
-狀態：${status}<br>
-${flower.confirmed ? "人工確認" : "未人工確認"}｜${flower.fruitTaken ? "已拿果" : "未拿果"}<br>
-<span class="flower-distance">${getFlowerDistanceText(flower)}</span>
-      </div>
+item.innerHTML = `
+  <div class="flower-item-title compact-title">
+    <span class="flower-main-text">${flower.name}</span>
+    <span class="flower-time-text">${remainingText}</span>
+    <button class="group-button" onclick="event.stopPropagation(); toggleFlowerGroup(${flower.id})">
+      ${getFlowerGroupText(flower)}
+    </button>
+  </div>
 
-      <div class="flower-actions">
-      <button class="edit-flower-button" onclick="event.stopPropagation(); editFlowerInfo(${flower.id})">編輯</button>  
-      <button onclick="event.stopPropagation(); updateFlowerTime(${flower.id})">更新時間</button>
-        <button onclick="event.stopPropagation(); toggleFruitTaken(${flower.id})">
-          ${flower.fruitTaken ? "改未拿果" : "標記已拿果"}
-        </button>
-        <button class="${routeButtonClass}" onclick="event.stopPropagation(); toggleRoute(${flower.id})">${routeText}</button>
-        <button onclick="event.stopPropagation(); deleteFlower(${flower.id})">刪除</button>
-      </div>
-    `;
+  <div class="flower-item-meta compact-meta">
+    ${getCompactFlowerMetaText(flower)}${flower.type ? `｜${flower.type}` : ""}
+  </div>
 
+  <div class="flower-actions compact-actions">
+    <button onclick="event.stopPropagation(); updateFlowerTime(${flower.id})">更新</button>
+    <button class="${routeButtonClass}" onclick="event.stopPropagation(); toggleRoute(${flower.id})">${routeText}</button>
+    <button class="edit-flower-button" onclick="event.stopPropagation(); editFlowerInfo(${flower.id})">編輯</button>
+    <button onclick="event.stopPropagation(); deleteFlower(${flower.id})">刪除</button>
+  </div>
+`;
     item.addEventListener("click", function () {
       focusFlower(flower.id);
     });
