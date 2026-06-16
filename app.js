@@ -651,7 +651,7 @@ window.shareBackupText = shareBackupText;
 // 本機儲存
 // =======================
 
-const APP_VERSION = "v0.4";
+const APP_VERSION = "v0.5";
 
 function trackEvent(eventName, params = {}) {
   console.log("GA event:", eventName, params);
