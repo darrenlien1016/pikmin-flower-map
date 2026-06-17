@@ -558,3 +558,19 @@ button.edit-flower-button {
   flex-direction: column;
   gap: 6px;
 }
+
+.hidden {
+  display: none !important;
+}
+
+.more-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#moreButton.active {
+  background: #ffcc80;
+  color: #3e2723;
+  font-weight: 700;
+}

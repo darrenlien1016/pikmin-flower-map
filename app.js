@@ -176,15 +176,57 @@ window.centerToGps = centerToGps;
 
 function toggleMoreMenu() {
   const menu = document.getElementById("moreMenu");
+  const button = document.getElementById("moreButton");
 
-  if (!menu) {
+  if (!menu || !button) {
     return;
   }
 
+  const isOpening = menu.classList.contains("hidden");
+
   menu.classList.toggle("hidden");
+
+  if (isOpening) {
+    button.innerText = "更少";
+    button.classList.add("active");
+  } else {
+    button.innerText = "更多";
+    button.classList.remove("active");
+  }
 }
 
 window.toggleMoreMenu = toggleMoreMenu;
+
+function showHelp() {
+  alert(
+    "皮克敏花朵地圖使用說明 🌸\n\n" +
+    "這個工具可以幫你記錄 Pikmin Bloom 大花位置、剩餘時間，並依開花時間分組安排路線。\n\n" +
+    "基本用法：\n" +
+    "1. 點地圖新增花點。\n" +
+    "2. 輸入花點名稱與剩餘時間，例如 2200 或 22:00。\n" +
+    "3. 可填寫備註，例如活動花、常開點、公園內、要走進去。\n" +
+    "4. 在花朵清單中按「待分組」，可切換 A組、B組、C組。\n" +
+    "5. 用分組篩選查看同一批花點。\n" +
+    "6. 把想跑的花點加入路線，再按 Google 導航。\n\n" +
+    "備份與分享：\n" +
+    "可以用「備份」下載花點資料，也可以用「分享」傳給朋友。朋友匯入時選「合併」，就不會洗掉原本花點。\n\n" +
+    "強烈建議先加入手機桌面：\n" +
+    "iPhone：請用 Safari 打開本網頁，點分享按鈕，選「加入主畫面」。\n" +
+    "Android：請用 Chrome 打開本網頁，點右上角更多選單，選「新增至主畫面」。\n\n" +
+    "回報問題：\n" +
+    "如果使用時遇到問題，請點「回報問題」填寫表單。"
+  );
+}
+
+window.showHelp = showHelp;
+
+function openReportForm() {
+  window.open("https://forms.gle/qLiZaZ6aSb8KvMmu6", "_blank");
+}
+
+window.openReportForm = openReportForm;
+
+
 
 // =======================
 // 備份 / 匯出 / 匯入
@@ -651,7 +693,7 @@ window.shareBackupText = shareBackupText;
 // 本機儲存
 // =======================
 
-const APP_VERSION = "v0.5";
+const APP_VERSION = "v0.6";
 
 function trackEvent(eventName, params = {}) {
   console.log("GA event:", eventName, params);
