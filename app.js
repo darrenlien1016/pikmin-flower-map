@@ -218,6 +218,41 @@ function showHelp() {
   );
 }
 
+function setFlowerCycleHours() {
+  const input = prompt(
+    `請輸入目前花朵倒數週期小時數：\n\n` +
+    `一般日：23\n` +
+    `社群日：3\n` +
+    `特殊活動：6\n\n` +
+    `目前設定：${flowerCycleHours} 小時`,
+    String(flowerCycleHours)
+  );
+
+  if (input === null) {
+    return;
+  }
+
+  const hours = Number(input.trim());
+
+  if (hours !== 3 && hours !== 6 && hours !== 23) {
+    alert("目前只支援 3、6、23 小時。");
+    return;
+  }
+
+  flowerCycleHours = hours;
+  saveFlowerCycleHours();
+
+  trackEvent("set_flower_cycle_hours", {
+    cycle_hours: flowerCycleHours
+  });
+
+  alert(`已設定花朵倒數週期為 ${flowerCycleHours} 小時。`);
+
+  renderAll();
+}
+
+window.setFlowerCycleHours = setFlowerCycleHours;
+
 window.showHelp = showHelp;
 
 function openReportForm() {
@@ -693,7 +728,7 @@ window.shareBackupText = shareBackupText;
 // 本機儲存
 // =======================
 
-const APP_VERSION = "v0.6";
+const APP_VERSION = "v0.7";
 
 function trackEvent(eventName, params = {}) {
   console.log("GA event:", eventName, params);
@@ -715,6 +750,7 @@ let selectedFlowerId = null;
 let flowerSearchText = "";
 let flowerSortMode = "time";
 let flowerGroupFilter = "all";
+let flowerCycleHours = loadFlowerCycleHours();
 
 function loadFlowers() {
   const saved = localStorage.getItem("pikminFlowers");
@@ -756,6 +792,25 @@ function loadRoute() {
 
 function saveRoute() {
   localStorage.setItem("pikminRoute", JSON.stringify(routeIds));
+}
+
+function loadFlowerCycleHours() {
+  const saved = localStorage.getItem("pikminFlowerCycleHours");
+  const hours = Number(saved);
+
+  if (hours === 3 || hours === 6 || hours === 23) {
+    return hours;
+  }
+
+  return 23;
+}
+
+function saveFlowerCycleHours() {
+  localStorage.setItem("pikminFlowerCycleHours", String(flowerCycleHours));
+}
+
+function getFlowerCycleMs() {
+  return flowerCycleHours * 60 * 60 * 1000;
 }
 
 // =======================
@@ -940,6 +995,44 @@ function getRemainingText(endTime) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function getEndTimeText(endTime) {
+  const end = new Date(endTime);
+
+  if (Number.isNaN(end.getTime())) {
+    return "";
+  }
+
+  const now = new Date();
+
+  const nowDate = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
+
+  const endDate = new Date(
+    end.getFullYear(),
+    end.getMonth(),
+    end.getDate()
+  );
+
+  const diffDays = Math.round(
+    (endDate.getTime() - nowDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  const timeText = end.toLocaleTimeString("zh-TW", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
+
+  if (diffDays === 0) {
+    return `今日 ${timeText}`;
+  }
+
+  return `明日 ${timeText}`;
+}
+
 function getRemainingMinutes(endTime) {
   return Math.floor(getRemainingMs(endTime) / 1000 / 60);
 }
@@ -953,11 +1046,11 @@ function applyAutoCycle() {
     let end = new Date(flower.endTime);
 
     while (end.getTime() <= now.getTime()) {
-      end = new Date(end.getTime() + 23 * 60 * 60 * 1000);
-      flower.confirmed = false;
-      flower.fruitTaken = false;
-      changed = true;
-    }
+  end = new Date(end.getTime() + getFlowerCycleMs());
+  flower.confirmed = false;
+  flower.fruitTaken = false;
+  changed = true;
+}
 
     flower.endTime = end.toISOString();
   });
@@ -982,9 +1075,12 @@ function getFlowerStatus(flower) {
     return "快結束";
   }
 
-  if (diffMinutes <= 23 * 60 && diffMinutes >= 22 * 60) {
-    return "剛開花，可採果";
-  }
+  if (
+  diffMinutes <= flowerCycleHours * 60 &&
+  diffMinutes >= (flowerCycleHours - 1) * 60
+) {
+  return "剛開花，可採果";
+}
 
   return "一般";
 }
@@ -1004,9 +1100,12 @@ function getFlowerClass(flower) {
     return "flower-ending";
   }
 
-  if (diffMinutes <= 23 * 60 && diffMinutes >= 22 * 60) {
-    return "flower-bloom";
-  }
+  if (
+  diffMinutes <= flowerCycleHours * 60 &&
+  diffMinutes >= (flowerCycleHours - 1) * 60
+) {
+  return "flower-bloom";
+}
 
   return "flower-normal";
 }
@@ -1026,9 +1125,12 @@ function getListStatusClass(flower) {
     return "list-ending";
   }
 
-  if (diffMinutes <= 23 * 60 && diffMinutes >= 22 * 60) {
-    return "list-bloom";
-  }
+  if (
+  diffMinutes <= flowerCycleHours * 60 &&
+  diffMinutes >= (flowerCycleHours - 1) * 60
+) {
+  return "list-bloom";
+}
 
   return "";
 }
@@ -1709,8 +1811,9 @@ const sortedFlowers = visibleFlowers.sort((a, b) => {
 
     updatePanelStats(sortedFlowers.length);  
     sortedFlowers.forEach((flower) => {
-    const remainingText = getRemainingText(flower.endTime);
-    const status = getFlowerStatus(flower);
+  const remainingText = getRemainingText(flower.endTime);
+  const endTimeText = getEndTimeText(flower.endTime);
+  const status = getFlowerStatus(flower);
     const flowerClass = getFlowerClass(flower);
     const listStatusClass = getListStatusClass(flower);
     const routeText = isInRoute(flower.id) ? "已在路線" : "加入路線";
@@ -1778,6 +1881,7 @@ item.innerHTML = `
   <div class="flower-item-title compact-title">
     <span class="flower-main-text">${flower.name}</span>
     <span class="flower-time-text">${remainingText}</span>
+    <span class="flower-end-time-text">${endTimeText}結束</span>
     <button class="group-button" onclick="event.stopPropagation(); toggleFlowerGroup(${flower.id})">
       ${getFlowerGroupText(flower)}
     </button>

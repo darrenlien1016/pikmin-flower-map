@@ -574,3 +574,10 @@ button.edit-flower-button {
   color: #3e2723;
   font-weight: 700;
 }
+
+.flower-end-time-text {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0.85;
+}
