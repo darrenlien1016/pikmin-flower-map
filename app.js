@@ -728,7 +728,7 @@ window.shareBackupText = shareBackupText;
 // 本機儲存
 // =======================
 
-const APP_VERSION = "v0.7";
+const APP_VERSION = "v0.7.1";
 
 function trackEvent(eventName, params = {}) {
   console.log("GA event:", eventName, params);
@@ -751,6 +751,7 @@ let flowerSearchText = "";
 let flowerSortMode = "time";
 let flowerGroupFilter = "all";
 let flowerCycleHours = loadFlowerCycleHours();
+let updatingFlowerId = null;
 
 function loadFlowers() {
   const saved = localStorage.getItem("pikminFlowers");
@@ -1355,14 +1356,69 @@ function updateFlowerTime(id) {
     return;
   }
 
-  const timeInput = prompt(
-    `請輸入「${flower.name}」新的剩餘時間，例如 2200 或 22:00`
-  );
+  updatingFlowerId = id;
 
-  if (timeInput === null) {
+  const modal = document.getElementById("updateTimeModal");
+  const title = document.getElementById("updateTimeTitle");
+  const input = document.getElementById("updateTimeInput");
+
+  if (!modal || !title || !input) {
+    alert("找不到更新時間視窗，請確認 index.html 是否已加入 updateTimeModal。");
     return;
   }
 
+  title.innerText = `更新時間：${flower.name}`;
+  input.value = "";
+
+  modal.classList.remove("hidden");
+
+  // 讓手機鍵盤盡量自動跳出
+  input.focus();
+  input.select();
+}
+
+function closeUpdateTimeModal() {
+  const modal = document.getElementById("updateTimeModal");
+  const input = document.getElementById("updateTimeInput");
+
+  if (input) {
+    input.value = "";
+  }
+
+  if (modal) {
+    modal.classList.add("hidden");
+  }
+
+  updatingFlowerId = null;
+}
+
+function submitUpdateTime() {
+  const flower = findFlower(updatingFlowerId);
+  const input = document.getElementById("updateTimeInput");
+
+  if (!flower || !input) {
+    closeUpdateTimeModal();
+    return;
+  }
+
+  const timeInput = input.value.trim();
+
+  // 留空 = 不改時間，只確認目前倒數
+  if (!timeInput) {
+    flower.confirmed = true;
+    flower.updatedAt = new Date().toISOString();
+
+    trackEvent("confirm_flower_time", {
+      source: "update_modal"
+    });
+
+    saveFlowers();
+    closeUpdateTimeModal();
+    keepFlowerPanelOpen(flower.id);
+    return;
+  }
+
+  // 有輸入 = 更新剩餘時間
   const endTime = parseRemainingTime(timeInput);
 
   if (!endTime) {
@@ -1373,11 +1429,13 @@ function updateFlowerTime(id) {
   flower.confirmed = true;
   flower.updatedAt = new Date().toISOString();
 
-  trackEvent("update_flower_time");
+  trackEvent("update_flower_time", {
+    source: "update_modal"
+  });
 
   saveFlowers();
-  renderAll();
-  focusFlower(id);
+  closeUpdateTimeModal();
+  keepFlowerPanelOpen(flower.id);
 }
 
 function editFlowerInfo(id) {
@@ -1990,6 +2048,8 @@ function drawRouteLine() {
 // =======================
 
 window.updateFlowerTime = updateFlowerTime;
+window.closeUpdateTimeModal = closeUpdateTimeModal;
+window.submitUpdateTime = submitUpdateTime;
 window.editFlowerInfo = editFlowerInfo;
 window.toggleFruitTaken = toggleFruitTaken;
 window.deleteFlower = deleteFlower;
@@ -2020,5 +2080,16 @@ if (importBackupInput) {
     }
 
     importBackupFromFile(file);
+  });
+}
+
+const updateTimeInput = document.getElementById("updateTimeInput");
+
+if (updateTimeInput) {
+  updateTimeInput.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitUpdateTime();
+    }
   });
 }

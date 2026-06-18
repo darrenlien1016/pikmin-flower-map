@@ -581,3 +581,56 @@ button.edit-flower-button {
   white-space: nowrap;
   opacity: 0.85;
 }
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-content {
+  width: min(360px, 100%);
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.modal-content h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.modal-help {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #555;
+}
+
+#updateTimeInput {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 18px;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.modal-actions button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+}
+
