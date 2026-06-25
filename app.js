@@ -728,7 +728,7 @@ window.shareBackupText = shareBackupText;
 // 本機儲存
 // =======================
 
-const APP_VERSION = "v0.7";
+const APP_VERSION = "v0.7.1";
 
 function trackEvent(eventName, params = {}) {
   console.log("GA event:", eventName, params);
@@ -1356,14 +1356,32 @@ function updateFlowerTime(id) {
   }
 
   const timeInput = prompt(
-    `請輸入「${flower.name}」新的剩餘時間，例如 2200 或 22:00`
+    `請輸入「${flower.name}」新的剩餘時間，例如 2200 或 22:00。\n\n` +
+    `如果目前倒數時間正確，請留空直接按確定，即可標記為已確認。`
   );
 
   if (timeInput === null) {
     return;
   }
 
-  const endTime = parseRemainingTime(timeInput);
+  const trimmedInput = timeInput.trim();
+
+  // 留空按確定：不改時間，只標記為已確認
+  if (!trimmedInput) {
+    flower.confirmed = true;
+    flower.updatedAt = new Date().toISOString();
+
+    trackEvent("confirm_flower_time", {
+      source: "update_prompt"
+    });
+
+    saveFlowers();
+    keepFlowerPanelOpen(id);
+    return;
+  }
+
+  // 有輸入時間：更新倒數時間
+  const endTime = parseRemainingTime(trimmedInput);
 
   if (!endTime) {
     return;
@@ -1373,11 +1391,12 @@ function updateFlowerTime(id) {
   flower.confirmed = true;
   flower.updatedAt = new Date().toISOString();
 
-  trackEvent("update_flower_time");
+  trackEvent("update_flower_time", {
+    source: "update_prompt"
+  });
 
   saveFlowers();
-  renderAll();
-  focusFlower(id);
+  keepFlowerPanelOpen(id);
 }
 
 function editFlowerInfo(id) {
